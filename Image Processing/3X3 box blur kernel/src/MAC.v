@@ -19,28 +19,24 @@ module MAC #(
     reg resMatrixBy9Valid;
     integer i;
     
+    initial begin
+        for(i=0;i<9;i=i+1)begin
+            kernel[i] <= 8'h1;
+        end
+    end
+    
     always@(posedge clk)
     begin
-        if(rst)begin
-            for(i=0;i<9;i=i+1)begin
-                kernel[i] <= 8'h1;
-                resMatrix[i] <= 15'h0;
-            end
-//            for(i=0;i<9;i=i+1)begin
-//                resMatrix[i] <= 15'h0;
-//            end
-        end else begin
             for(i=0;i<9;i=i+1)begin
                 resMatrix[i] <= inPixel[i*8+:8] * kernel[i];
             end
             resMatrixValid <= inPixelValid;
-        end
     end
     
     always@(*)begin
         if(rst)begin
             matrixSumReg = 'h0;
-        end else if(resMatrixValid) begin
+        end else begin
             matrixSumReg = 'h0;
             for(i=0;i<9;i=i+1)begin
                 matrixSumReg = matrixSumReg + resMatrix[i];
@@ -58,7 +54,7 @@ module MAC #(
         if(rst)begin
             resMatrixBy9Valid <= 0;
             resMatrixBy9 <= 0;
-        end else if(matrixSumValid)begin
+        end else begin
             resMatrixBy9 <= matrixSum / 9;
             resMatrixBy9Valid <= matrixSumValid;
         end

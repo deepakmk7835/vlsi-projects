@@ -33,13 +33,13 @@ always@(posedge clk)
 begin
     if(rst)begin
         rdptr <= 1'b0;
-        outPixelReg <= 'h0;
-    end else if(outPixelReady && rdptr < IMG_WIDTH-2)begin
-        outPixelReg <= {buffer[rdptr], buffer[rdptr+1], buffer[rdptr+2]};
+//        outPixelReg <= 'h0;
+    end else if(outPixelReady)begin
+//        outPixelReg <= {buffer[rdptr], buffer[rdptr+1], buffer[rdptr+2]};
         rdptr <= rdptr + 1'b1;
     end
 end
 
-assign outPixel = outPixelReg; 
- 
+//assign outPixel = outPixelReg; 
+assign outPixel = {buffer[rdptr], buffer[rdptr+1], buffer[rdptr+2]};
 endmodule

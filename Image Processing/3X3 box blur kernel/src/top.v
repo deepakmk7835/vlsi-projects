@@ -81,56 +81,17 @@ module top #(
         end
     end
     
-//    always@(posedge clk)begin
-//        if(rst)begin
-//            buffInPixelValid <= 'h0;
-//        end else begin
-//            buffInPixelValid[wrBuff] <= inPixelValid;
-//        end
-//    end
-    
     always@(*)begin
-        if(rst)begin
-            buffInPixelValid = 'h0;
-        end else if(inPixelValid)begin
-            case(wrBuff)
-            2'b00:begin
-                buffInPixelValid[0] = 1'b1;
-                buffInPixelValid[1] = 1'b0;
-                buffInPixelValid[2] = 1'b0;
-                buffInPixelValid[3] = 1'b0;
-            end
-            
-            2'b01:begin
-                buffInPixelValid[0] = 1'b0;
-                buffInPixelValid[1] = 1'b1;
-                buffInPixelValid[2] = 1'b0;
-                buffInPixelValid[3] = 1'b0;
-            end
-            
-            2'b10:begin
-                buffInPixelValid[0] = 1'b0;
-                buffInPixelValid[1] = 1'b0;
-                buffInPixelValid[2] = 1'b1;
-                buffInPixelValid[3] = 1'b0;
-            end
-            
-            2'b11:begin
-                buffInPixelValid[0] = 1'b0;
-                buffInPixelValid[1] = 1'b0;
-                buffInPixelValid[2] = 1'b0;
-                buffInPixelValid[3] = 1'b1;
-            end
-            endcase
-        end
+        buffInPixelValid = 'h0;
+        buffInPixelValid[wrBuff] = inPixelValid;
     end
-    
+       
     //Read Logic
     
     always@(posedge clk)begin
         if(rst)begin
             rdBuffEnCount <= 'h0;
-        end else if(inPixelValid && rdBuffEnCount < 3*IMG_WIDTH)begin
+        end else if(inPixelValid && !rdBuffEn)begin
             rdBuffEnCount <= rdBuffEnCount + 1'b1;
         end else if(~inPixelValid && rdBuffEn)begin
             rdBuffEnCount <= rdBuffEnCount - 1'b1;
@@ -140,9 +101,9 @@ module top #(
     always@(posedge clk)begin
         if(rst)begin
             rdBuffEn <= 1'b0;
-        end else if(rdBuffEnCount == 3*IMG_WIDTH-1)begin
+        end else if(rdBuffEnCount >= 3*IMG_WIDTH-1)begin
             rdBuffEn <= 1'b1;
-        end else if(rdBuffEnCount == 2*IMG_WIDTH-1)begin
+        end else if(outPixelCount == IMG_WIDTH-1)begin
             rdBuffEn <= 1'b0;
         end
     end
@@ -169,34 +130,34 @@ module top #(
             buffOutPixelReady[1] = 1'b0;
             buffOutPixelReady[2] = 1'b0;
             buffOutPixelReady[3] = 1'b0;
-        end else if(rdBuffEn)begin
+        end else begin
             case(rdBuff)
             2'b00:begin
-                buffOutPixelReady[0] = 1'b1;
-                buffOutPixelReady[1] = 1'b1;
-                buffOutPixelReady[2] = 1'b1;
+                buffOutPixelReady[0] = rdBuffEn;
+                buffOutPixelReady[1] = rdBuffEn;
+                buffOutPixelReady[2] = rdBuffEn;
                 buffOutPixelReady[3] = 1'b0;
             end 
             
             2'b01:begin
                 buffOutPixelReady[0] = 1'b0;
-                buffOutPixelReady[1] = 1'b1;
-                buffOutPixelReady[2] = 1'b1;
-                buffOutPixelReady[3] = 1'b1;
+                buffOutPixelReady[1] = rdBuffEn;
+                buffOutPixelReady[2] = rdBuffEn;
+                buffOutPixelReady[3] = rdBuffEn;
             end
             
             2'b10:begin
-                buffOutPixelReady[0] = 1'b1;
+                buffOutPixelReady[0] = rdBuffEn;
                 buffOutPixelReady[1] = 1'b0;
-                buffOutPixelReady[2] = 1'b1;
-                buffOutPixelReady[3] = 1'b1;
+                buffOutPixelReady[2] = rdBuffEn;
+                buffOutPixelReady[3] = rdBuffEn;
             end
             
             2'b11:begin
-                buffOutPixelReady[0] = 1'b1;
-                buffOutPixelReady[1] = 1'b1;
+                buffOutPixelReady[0] = rdBuffEn;
+                buffOutPixelReady[1] = rdBuffEn;
                 buffOutPixelReady[2] = 1'b0;
-                buffOutPixelReady[3] = 1'b1;
+                buffOutPixelReady[3] = rdBuffEn;
             end
             endcase
         end
@@ -205,7 +166,7 @@ module top #(
     always@(posedge clk)begin
         if(rst)begin
             rdBuffEmptyReg <= 1'b0;
-        end else if(outPixelCount == IMG_WIDTH-1)begin
+        end else if(rdBuffEn && outPixelCount == IMG_WIDTH-1)begin
             rdBuffEmptyReg <= 1'b1;
         end else begin
             rdBuffEmptyReg <= 1'b0;
