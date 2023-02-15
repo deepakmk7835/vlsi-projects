@@ -11,6 +11,9 @@ reg [1:0]count;
 reg clkOutReg;
 reg refClkOutReg;
 
+assign clkOut = clkOutReg;
+assign refClkOut = refClkOutReg;
+
 always@(posedge clk)
 begin
 	if(rst)begin
