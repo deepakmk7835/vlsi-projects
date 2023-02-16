@@ -6,6 +6,7 @@ module I2CMaster #(
 	input clk,
 	input dclk,
 	input rst,
+	input newTransfer,
 	inout [DATA_WIDTH-1:0]sda,
 	output sclk
 );
@@ -51,7 +52,7 @@ always@(*)begin
 	end else begin
 		case(pState)
 			`IDLE: begin
-				if(count == T-1)
+				if(newTransfer)
 					nState <= `START;
 			end
 
@@ -125,7 +126,6 @@ always@(*)begin
 			`IDLE: begin
 				sdaReg <= 1;
 				sclkReg <= 1;
-				T <= 4'd1;
 				noSdaAccess <= 0;
 			end 
 
@@ -178,7 +178,7 @@ always@(*)begin
 			`STOP: begin
 				T <= 4'd1;
 				sclkReg <= 1;
-				sdaReg <= dclk;
+				sdaReg <= ~dclk;
 				noSdaAccess <= 0;
 			end
 		endcase
