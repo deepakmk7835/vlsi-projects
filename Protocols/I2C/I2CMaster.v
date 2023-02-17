@@ -1,25 +1,28 @@
 `timescale 1ns/1ps
 
+`define IDLE    9'b0000_0000_1
+`define START   9'b0000_0001_0
+`define SLVADDR 9'b0000_0010_0
+`define ADDRACK 9'b0000_0100_0
+`define REGADDR 9'b0000_1000_0
+`define REGACK  9'b0001_0000_0
+`define DATA    9'b0010_0000_0
+`define DATAACK 9'b0100_0000_0
+`define STOP    9'b1000_0000_0
+
 module I2CMaster #(
 	parameter DATA_WIDTH = 8
 )(
 	input clk,
 	input dclk,
 	input rst,
-	input newTransfer,
+	input wrEn,
+	input [DATA_WIDTH-1:0]dataIn,
+	input [DATA_WIDTH-1:0]slvAddr,
+	input [DATA_WIDTH-1:0]regAddr,
 	inout [DATA_WIDTH-1:0]sda,
 	output sclk
 );
-
-`define IDLE    = 9'b0000_0000_1;
-`define START   = 9'b0000_0001_0;
-`define SLVADDR = 9'b0000_0010_0;
-`define ADDRACK = 9'b0000_0100_0;
-`define REGADDR = 9'b0000_1000_0;
-`define REGACK  = 9'b0001_0000_0;
-`define DATA    = 9'b0010_0000_0;
-`define DATAACK = 9'b0100_0000_0;
-`define STOP    = 9'b1000_0000_0;
 
 reg [8:0]pState, nState;
 
@@ -27,11 +30,23 @@ reg sdaReg;
 reg sclkReg;
 reg noSdaAccess;
 
+reg [DATA_WIDTH-1:0]SLV_ADDRESS;
+reg [DATA_WIDTH-1:0]REG_ADDRESS;
+reg [DATA_WIDTH-1:0]SLV_DATA;
+
 assign sda = !noSdaAccess ? sdaReg : 8'bZZZZ_ZZZZ;
 assign sclk = sclkReg;
 
 reg [$clog2(DATA_WIDTH)-1:0]count;
 reg [3:0]T;
+
+always@(posedge dclk)begin
+    if(wrEn)
+        SLV_DATA <= dataIn;
+    
+    SLV_ADDRESS <= slvAddr;
+    REG_ADDRESS <= regAddr;
+end
 
 always@(posedge dclk)begin
 	if(rst)begin
@@ -43,16 +58,16 @@ always@(posedge dclk)begin
 	end
 end
 
-reg [2:0]I2C_ACK;
+reg [2:0]SPI_ACK;
 
 //Next State Logic
 always@(*)begin
 	if(rst)begin
-		nState = `IDLE;
+		nState <= `IDLE;
 	end else begin
 		case(pState)
 			`IDLE: begin
-				if(newTransfer)
+				if(wrEn)
 					nState <= `START;
 			end
 
@@ -69,7 +84,7 @@ always@(*)begin
 
 			`ADDRACK: begin
 				if(count == T-1)begin
-					I2C_ACK[0] <= sda;
+					SPI_ACK[0] <= sda;
 					nState <= `REGADDR;
 				end
 			end
@@ -82,7 +97,7 @@ always@(*)begin
 
 			`REGACK: begin
 				if(count == T-1)begin
-					I2C_ACK[1] <= sda;
+					SPI_ACK[1] <= sda;
 					nState <= `DATA;
 				end
 			end
@@ -95,7 +110,7 @@ always@(*)begin
 
 			`DATAACK: begin
 				if(count == T-1)begin	
-					I2C_ACK[2] <= sda;
+					SPI_ACK[2] <= sda;
 					nState <= `STOP;
 				end
 			end
@@ -126,6 +141,7 @@ always@(*)begin
 			`IDLE: begin
 				sdaReg <= 1;
 				sclkReg <= 1;
+				T <= 4'd1;
 				noSdaAccess <= 0;
 			end 
 
@@ -138,7 +154,7 @@ always@(*)begin
 
 			`SLVADDR: begin
 				sclkReg <= clk;
-				sdaReg <= `SLV_ADDRESS[7-count];
+				sdaReg <= SLV_ADDRESS[7-count];
 				T <= 4'd8;
 				noSdaAccess <= 0;
 			end
@@ -151,7 +167,7 @@ always@(*)begin
 
 			`REGADDR: begin
 				sclkReg <= clk;
-				sdaReg <= `REG_ADDRESS[7-count];
+				sdaReg <= REG_ADDRESS[7-count];
 				T <= 4'd8;
 				noSdaAccess <= 0;
 			end
@@ -164,7 +180,7 @@ always@(*)begin
 
 			`DATA: begin
 				sclkReg <= clk;
-				sdaReg <= `SLV_DATA[7-count];
+				sdaReg <= SLV_DATA[7-count];
 				T <= 4'd8;
 				noSdaAccess <= 0;
 			end
@@ -178,7 +194,7 @@ always@(*)begin
 			`STOP: begin
 				T <= 4'd1;
 				sclkReg <= 1;
-				sdaReg <= ~dclk;
+				sdaReg <= dclk;
 				noSdaAccess <= 0;
 			end
 		endcase
@@ -186,3 +202,5 @@ always@(*)begin
 end
 
 endmodule
+
+
