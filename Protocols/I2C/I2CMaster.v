@@ -141,7 +141,6 @@ always@(*)begin
 			`IDLE: begin
 				sdaReg <= 1;
 				sclkReg <= 1;
-				T <= 4'd1;
 				noSdaAccess <= 0;
 			end 
 
@@ -194,7 +193,7 @@ always@(*)begin
 			`STOP: begin
 				T <= 4'd1;
 				sclkReg <= 1;
-				sdaReg <= dclk;
+				sdaReg <= ~dclk;
 				noSdaAccess <= 0;
 			end
 		endcase
