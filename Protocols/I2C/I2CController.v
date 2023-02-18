@@ -6,7 +6,8 @@ module I2CController #(
     input clk,
     input rst,
     input wrEn,
-    input [DATA_WIDTH-1:0]slvAddr,
+    input newTXN,
+    input [DATA_WIDTH-2:0]slvAddr,
 	input [DATA_WIDTH-1:0]regAddr,
     input [DATA_WIDTH-1:0]dataIn
 //    output [DATA_WIDTH-1:0]dataOut
@@ -15,10 +16,10 @@ module I2CController #(
     wire sclk_net;
     wire sclk_net_top;
     wire dclk_net_top;
-    wire [DATA_WIDTH-1:0]sda_net;
+    wire sda_net;
     
     //Clock Divider FPGA 100MHz clock to I2C 1MHz clock
-    clk_top(
+    clk_top clkDivider(
 	   .clk(clk), //100MHz clock
 	   .rst(rst),
 	   .sclk(sclk_net_top), //1MHz clock
@@ -30,6 +31,7 @@ module I2CController #(
         .clk(sclk_net_top),
 	    .dclk(dclk_net_top),
 	    .rst(rst),
+	    .newTXN(newTXN),
 	    .wrEn(wrEn),
 	    .dataIn(dataIn), //SLVDATA
 	    .slvAddr(slvAddr),

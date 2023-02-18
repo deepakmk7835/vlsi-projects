@@ -7,7 +7,7 @@ module I2CSlave #(
     input rst,
 	input sclk,
 	input dclk,
-	inout [DATA_WIDTH-1:0]sda
+	inout sda
 );
 
 localparam IDLE     =    11'b000000_0000_1,
@@ -23,7 +23,7 @@ localparam IDLE     =    11'b000000_0000_1,
         STOP        =    11'b100000_0000_0;
 
  reg [31:0]regFile[31:0]; //32 Register, each 32-bit wide
- reg [8:0] pState, nState;
+ reg [10:0] pState, nState;
 
  reg [7:0]regAddress;
  reg [6:0]slvAddr;
@@ -32,17 +32,32 @@ localparam IDLE     =    11'b000000_0000_1,
 
  reg [DATA_WIDTH-1:0]dataOut;
  reg [DATA_WIDTH-1:0]dataReg;
- reg [DATA_WIDTH-1:0]sdaReg;
+ reg sdaReg;
+ 
+ reg sdaV2;
 
  reg readEn;
  reg writeEn;
  reg dataAck;
  
+ wire fallEdgeDetected;
+ wire riseEdgeDetected;
+ 
  integer count;
 
 assign sda = sdaReg;
+assign fallEdgeDetected = sdaV2 && ~sda;
+assign riseEdgeDetected = ~sdaV2 && sda;
 
- always@(posedge sclk)begin
+initial begin
+    regFile[1] <= 32'd3;
+end
+
+always@(posedge dclk)begin
+    sdaV2 <= sda;
+end
+
+ always@(posedge dclk)begin
 	 if(readEn)begin
 		dataOut <= regFile[regAddress];
 	 end
@@ -52,7 +67,7 @@ assign sda = sdaReg;
 	 end
  end
 
- always@(posedge sclk)begin
+ always@(posedge dclk)begin
 	 if(rst)begin
 		 count <= 'h0;
 	 end else if(count < T-1)begin
@@ -63,75 +78,73 @@ assign sda = sdaReg;
  end
 
  always@(*)begin
-	 if(rst)begin
-		 nState <= IDLE;
-	 end else begin
+	 nState = pState;
 		 case(pState)
 			 IDLE: begin
-				nState <= START;
+				nState = START;
 			 end
 
 			 START: begin
-				 if(sclk && (sda == dclk))begin
-					 nState <= SLVADDR;
+				 if(fallEdgeDetected)begin
+					 nState = SLVADDR;
 				 end					 
 			 end
 
 			 SLVADDR: begin
 				if(count == T-1)
-		       			nState <= ADDRACK;			
+		       		nState = ADDRACK;			
 			 end
 
 			 ADDRACK: begin
 				 if(count == T-1)
-					 nState <= ADDRACK;
+					 nState = REGADDR;
 			 end
 
 			 REGADDR: begin
 				 if(count == T-1)
-					 nState <= REGACK;
+					 nState = REGACK;
 			 end
 
 			 REGACK: begin
 				 if(count == T-1)begin
 					 if(writeEn)
-					 	nState <= DATARECV;
+					 	nState = DATARECV;
 					 else if(readEn)
-						 nState <= DATASEND;
+						 nState = DATASEND;
 				end	
 			 end
 
 			 DATARECV: begin
 				 if(count == T-1)
-					 nState <= DATAACK;
+					 nState = DATAACK;
 			 end
 
 			 DATAACK: begin
 				 if(count == T-1)
-					 nState <= STOP;
+					 nState = STOP;
 			 end
 
 			 DATASEND: begin
 				if(count == T-1)
-				       nState <= DATASENTACK;	       
+				       nState = DATASENTACK;	       
 			 end
 
 			 DATASENTACK: begin
 				 if(count == T-1)begin
-				 	dataAck <= sda;
-					 nState <= STOP;
+				 	dataAck = sda;
+					 nState = STOP;
 				 end
 			 end
 
 			 STOP: begin
-				 nState <= IDLE;
+			     if(riseEdgeDetected)
+				    nState = START;
 			 end
 			 
 		 endcase
-	 end
  end
 
- always@(posedge sclk)begin
+ always@(posedge dclk or posedge rst)begin
 	 if(rst)begin
 		 pState <= IDLE;
 	 end else begin
@@ -141,65 +154,79 @@ assign sda = sdaReg;
 
 always@(*)begin
 	 if(rst)begin
-		 nState <= IDLE;
+		 sdaReg = 'bz;
 	 end else begin
 		 case(pState)
+		     IDLE: begin
+		      sdaReg = 'bz;
+		     end
+		     
+		     START: begin
+		      sdaReg = 'bz;
+		     end
+		     
 			 SLVADDR: begin
-				 T <= 8;
+				 T = 8;
 				 if(count <= T-2)begin //Receive SLAVEADDR 7-bit wide
-					slvAddr[6-count] <= sda;
+					slvAddr[6-count] = sda;
 				end else if(sda) begin //check whether it is a write request or read request
-				 	readEn <= 1;
+				 	readEn = 1;
+				 	writeEn = 0;
 				end else begin
-					writeEn <= 1;
+					writeEn = 1;
+					readEn = 0;
 				end	
 			 end
 
 			 ADDRACK: begin
-				 T <= 1;
+				 T = 1;
 				 if(slvAddr ==  SLV_ADDR) //If SLVADDR matches current device address then send ACK
-				 	sdaReg <= 1'b0; //ACK
+				 	sdaReg = 1'b0; //ACK
 				 else 
-					 sdaReg <= 1'b1;//NACK
+					 sdaReg = 1'b1;//NACK
 			 end
 
 			 REGADDR: begin
-				 T <= 8;
-				 if(count == T-1)begin
-					 regAddress[7-count] <= sda;
+				 T = 8;
+				 sdaReg = 'bz;
+				 if(count <= T-1)begin
+					 regAddress[7-count] = sda;
 			     end
 			 end
 
 			 REGACK: begin
-				 T <= 1;
-				 if(regAddress > 1 && regAddress < 8'd32) //If SLVADDR matches current device address then send ACK
-				 	sdaReg <= 1'b0; //ACK
+				 T = 1;
+				 if(regAddress >= 0 && regAddress < 8'd32) //If SLVADDR matches current device address then send ACK
+				 	sdaReg = 1'b0; //ACK
 				 else 
-					 sdaReg <= 1'b1;//NACK
+					 sdaReg = 1'b1;//NACK
 			 end
 
 			 DATARECV: begin
-				 T <= 8;
+				 T = 8;
+				 sdaReg = 'bz;
 				 if(count <= T-1)
-					 dataReg[7-count] <= sda;
+					 dataReg[7-count] = sda;
 			 end
 
 			 DATAACK: begin
-				 T <= 1;
-				 sdaReg <= 1'b0;
+				 T = 1;
+				 sdaReg = 1'b0;
 			 end
 
 			 DATASEND: begin
-				 T <= 8;
-				 sdaReg <= dataOut[7-count];
+				 T = 8;
+				 sdaReg = dataOut[7-count];
 			 end
 
 			 DATASENTACK: begin
-				 T <= 1;
+				 T = 1;
+				 sdaReg = 'bz;
 			 end
 
 			 STOP: begin
-				 T <= 1;
+				 T = 1;
+				 sdaReg = 'bz;
 			 end
 			 
 		 endcase
