@@ -13,7 +13,7 @@ module UARTTX #(
 	input wrEn,
 	input [DATA_WIDTH-1:0]dataIn,
 	input newTXN,
-	output uartBus
+	output UART_TX
 );
 
 localparam IDLE  = 2'b00,
@@ -23,10 +23,12 @@ localparam IDLE  = 2'b00,
 
 reg [DATA_WIDTH-1:0]dataInReg;
 reg [$clog2(10417)-1:0]count;
-reg [$clog2(DATA_WIDTH)-1:0]dataBits;
+reg [$clog2(DATA_WIDTH):0]dataBits;
 reg uartBusReg;
 
 reg [1:0]pState;
+
+assign UART_TX = uartBusReg;
 
 always@(posedge clk)begin
 	if(wrEn)
@@ -39,6 +41,8 @@ always@(posedge clk)begin
 	if(rst) begin
 		uartBusReg <= 1'b1;
 		dataBits <= 'h0;
+		count <= 'h0;
+		pState <= IDLE;
 	end else begin
 		case(pState)
 			IDLE: begin
@@ -53,7 +57,7 @@ always@(posedge clk)begin
 			end
 	
 			TX: begin
-				if(count < CLOCKS_PER_BIT - 1 && dataBits <= DATA_WIDTH-1)begin
+				if(count < CLOCKS_PER_BIT - 1 && dataBits <= DATA_WIDTH)begin
 					count <= count + 1'b1;
 					pState <= TX;
 				end else if(count == CLOCKS_PER_BIT - 1 && dataBits <= DATA_WIDTH-1)begin
@@ -61,7 +65,7 @@ always@(posedge clk)begin
 					dataBits <= dataBits + 1'b1;
 					count <= 'h0;
 					pState <= TX;
-				end else begin
+				end else if(count == CLOCKS_PER_BIT - 1 && dataBits == DATA_WIDTH)begin
 					dataBits <= 'h0;
 					count <= 'h0;
 					pState <= STOP;
@@ -70,10 +74,10 @@ always@(posedge clk)begin
 	
 			STOP: begin
 				if(count < CLOCKS_PER_BIT - 1) begin
+				    uartBusReg <= 1'b1;
 					count <= count + 1'b1;
 					pState <= STOP;
 				end else if(count == CLOCKS_PER_BIT - 1)begin
-					uartBusReg <= 1'b1;
 					count <= 'h0;
 					pState <= IDLE;
 				end
@@ -82,4 +86,4 @@ always@(posedge clk)begin
 	end
 end
 
-endmodule
+endmodulendmodule
