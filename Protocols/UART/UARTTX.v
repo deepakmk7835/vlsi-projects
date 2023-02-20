@@ -41,41 +41,41 @@ always@(posedge clk)begin
 		dataBits <= 'h0;
 	end else begin
 		case(pState)
-			`IDLE: begin
+			IDLE: begin
 				uartBusReg <= 1'b1;
 				if(newTXN)
-					pState <= `START;		
+					pState <= START;		
 			end
 	
-			`START: begin
+			START: begin
 				uartBusReg <= 1'b0;
-				pState <= `TX;
+				pState <= TX;
 			end
 	
-			`TX: begin
+			TX: begin
 				if(count < CLOCKS_PER_BIT - 1 && dataBits <= DATA_WIDTH-1)begin
 					count <= count + 1'b1;
-					pState <= `TX;
+					pState <= TX;
 				end else if(count == CLOCKS_PER_BIT - 1 && dataBits <= DATA_WIDTH-1)begin
 					uartBusReg <= dataInReg[dataBits];
 					dataBits <= dataBits + 1'b1;
 					count <= 'h0;
-					pState <= `TX;
+					pState <= TX;
 				end else begin
 					dataBits <= 'h0;
 					count <= 'h0;
-					pState <= `STOP;
+					pState <= STOP;
 				end	
 			end
 	
-			`STOP: begin
+			STOP: begin
 				if(count < CLOCKS_PER_BIT - 1) begin
 					count <= count + 1'b1;
-					pState <= `STOP;
+					pState <= STOP;
 				end else if(count == CLOCKS_PER_BIT - 1)begin
 					uartBusReg <= 1'b1;
 					count <= 'h0;
-					pState <= `IDLE;
+					pState <= IDLE;
 				end
 			end
 		endcase

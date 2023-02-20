@@ -42,38 +42,38 @@ always@(posedge clk)begin
 		dataBits <= 'h0;
 	end else begin
 		case(pState)
-			`IDLE: begin
+			IDLE: begin
 				if(startBitDetected) begin
 					if(count < (CLOCKS_PER_BIT/2)-1)begin
 						count <= count + 1'b1;
-						pState <= `IDLE;
+						pState <= IDLE;
 					end else if(count == (CLOCKS_PER_BIT/2)-1)begin
 						count <= 'h0;
-						pState <= `RX;
+						pState <= RX;
 					end
 				end
 			end
 
-			`RX: begin
+			RX: begin
 				if(dataBits < (DATA_WIDTH-1) && count < CLOCKS_PER_BIT-1)begin
 					count <= count + 1'b1;
-					pState <= `RX;
+					pState <= RX;
 				end else if(dataBits < (DATA_WIDTH-1) && count == CLOCKS_PER_BIT-1)begin
 					count <= 'h0;
 					rxBuff[index] <= UART_RX;
 					index <= index + 1'b1;
 					dataBits <= dataBits + 1'b1;
-					pState <= `RX;
+					pState <= RX;
 				end else begin
 					dataBits <= 'h0;
 					index <= 'h0;
-					pState <= `STOP;
+					pState <= STOP;
 				end
 			end
 
-			`STOP: begin
+			STOP: begin
 				if(stopBitDetected)begin
-					pState <= `IDLE;
+					pState <= IDLE;
 				end
 			end
 		endcase
